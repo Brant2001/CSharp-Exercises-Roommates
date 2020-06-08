@@ -50,7 +50,7 @@ namespace Roommates.Repositories
                         //  For our query, "Id" has an ordinal value of 0 and "Name" is 1.
                         int idColumnPosition = reader.GetOrdinal("Id");
 
-                        // We user the reader's GetXXX methods to get the value for a particular ordinal.
+                        // We use the reader's GetX methods to get the value for a particular ordinal.
                         int idValue = reader.GetInt32(idColumnPosition);
 
                         int nameColumnPosition = reader.GetOrdinal("Name");
@@ -76,6 +76,104 @@ namespace Roommates.Repositories
 
                     // Return the list of rooms who whomever called this method.
                     return rooms;
+                }
+            }
+        }
+        /// <summary>
+        ///  Returns a single room with the given id.
+        /// </summary>
+        public Room GetById(int id)
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT Name, MaxOccupancy FROM Room WHERE Id = @id";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    Room room = null;
+
+                    // If we only expect a single row back from the database, we don't need a while loop.
+                    if (reader.Read())
+                    {
+                        room = new Room
+                        {
+                            Id = id,
+                            Name = reader.GetString(reader.GetOrdinal("Name")),
+                            MaxOccupancy = reader.GetInt32(reader.GetOrdinal("MaxOccupancy")),
+                        };
+                    }
+
+                    reader.Close();
+
+                    return room;
+                }
+            }
+        }
+        /// <summary>
+        ///  Add a new room to the database
+        ///   NOTE: This method sends data to the database,
+        ///   it does not get anything from the database, so there is nothing to return.
+        /// </summary>
+        public void Insert(Room room)
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    // These SQL parameters are annoying. Why can't we use string interpolation?
+                    // ... sql injection attacks!!!
+                    cmd.CommandText = @"INSERT INTO Room (Name, MaxOccupancy) 
+                                         OUTPUT INSERTED.Id 
+                                         VALUES (@name, @maxOccupancy)";
+                    cmd.Parameters.AddWithValue("@name", room.Name);
+                    cmd.Parameters.AddWithValue("@maxOccupancy", room.MaxOccupancy);
+                    int id = (int)cmd.ExecuteScalar();
+
+                    room.Id = id;
+                }
+            }
+
+            // when this method is finished we can look in the database and see the new room.
+        }
+        /// <summary>
+        ///  Updates the room
+        /// </summary>
+        public void Update(Room room)
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE Room
+                                    SET Name = @name,
+                                        MaxOccupancy = @maxOccupancy
+                                    WHERE Id = @id";
+                    cmd.Parameters.AddWithValue("@name", room.Name);
+                    cmd.Parameters.AddWithValue("@maxOccupancy", room.MaxOccupancy);
+                    cmd.Parameters.AddWithValue("@id", room.Id);
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+        /// <summary>
+        ///  Delete the room with the given id
+        /// </summary>
+        public void Delete(int id)
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM Room WHERE Id = @id";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
                 }
             }
         }
