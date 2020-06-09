@@ -63,11 +63,8 @@ namespace Roommates.Repositories
                         int rentPortionColumnPosition = reader.GetOrdinal("RentPortion");
                         int rentPortionValue = reader.GetInt32(rentPortionColumnPosition);
 
-                        int movedInDateColumnPosition = reader.GetOrdinal("MovedInDate");
+                        int movedInDateColumnPosition = reader.GetOrdinal("MoveInDate");
                         DateTime movedInDateValue = reader.GetDateTime(movedInDateColumnPosition);
-
-                        int roomIdColumnPosition = reader.GetOrdinal("Room");
-                        int roomIdValue = reader.GetInt32(roomIdColumnPosition);
 
                         // Now let's create a new room object using the data from the database.
                         Roommate roommate = new Roommate
@@ -76,7 +73,7 @@ namespace Roommates.Repositories
                             FirstName = firstNameValue,
                             LastName = lastNameValue,
                             RentPortion = rentPortionValue,
-                            MovedInDate = movedInDateValue,
+                            MoveInDate = movedInDateValue,
                             Room = null
                         };
 
@@ -117,13 +114,65 @@ namespace Roommates.Repositories
                             FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
                             LastName = reader.GetString(reader.GetOrdinal("LastName")),
                             RentPortion = reader.GetInt32(reader.GetOrdinal("RentPortion")),
-                            MovedInDate = reader.GetDateTime(reader.GetOrdinal("MovedInDate")),
+                            MoveInDate = reader.GetDateTime(reader.GetOrdinal("MovedInDate")),
                         };
                     }
 
                     reader.Close();
 
                     return roommate;
+                }
+            }
+        }
+
+        public List<Roommate> GetAllWithRoom()
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"SELECT 
+rm.Id, 
+rm.FirstName, 
+rm.LastName, 
+rm.RentPortion, 
+rm.MoveInDate,
+rm.RoomId AS RoomId,
+r.Name,
+r.MaxOccupancy
+FROM Roommate rm 
+LEFT JOIN Room r ON r.id = rm.roomId";
+
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    Roommate roommate = null;
+
+                    List<Roommate> roommates = new List<Roommate>();
+
+                    // If we only expect a single row back from the database, we don't need a while loop.
+                    while (reader.Read())
+                    {
+                        roommate = new Roommate
+                        {
+                            Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                            FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
+                            LastName = reader.GetString(reader.GetOrdinal("LastName")),
+                            RentPortion = reader.GetInt32(reader.GetOrdinal("RentPortion")),
+                            MoveInDate = reader.GetDateTime(reader.GetOrdinal("MoveInDate")),
+                            Room = new Room 
+                            { 
+                                Id = reader.GetInt32(reader.GetOrdinal("RoomId")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                MaxOccupancy = reader.GetInt32(reader.GetOrdinal("MaxOccupancy"))
+                            }
+                        };
+                        roommates.Add(roommate);
+                    }
+
+                    reader.Close();
+
+                    return roommates;
                 }
             }
         }
@@ -141,13 +190,14 @@ namespace Roommates.Repositories
                 {
                     // These SQL parameters are annoying. Why can't we use string interpolation?
                     // ... sql injection attacks!!!
-                    cmd.CommandText = @"INSERT INTO Roommate (FirstName, LastName, RentPortion, MovedInDate, RoomId) 
+                    cmd.CommandText = @"INSERT INTO Roommate (FirstName, LastName, RentPortion, MoveInDate, Room) 
                                          OUTPUT INSERTED.Id 
-                                         VALUES (@firstName, @lastName, @rentPortion, @movedInDate, @roomId)";
+                                         VALUES (@firstName, @lastName, @rentPortion, @moveInDate, @room)";
                     cmd.Parameters.AddWithValue("@firstName", roommate.FirstName);
                     cmd.Parameters.AddWithValue("@lastName", roommate.LastName);
                     cmd.Parameters.AddWithValue("@rentPortion", roommate.RentPortion);
-                    cmd.Parameters.AddWithValue("@movedInDate", roommate.MovedInDate);
+                    cmd.Parameters.AddWithValue("@moveInDate", roommate.MoveInDate);
+                    cmd.Parameters.AddWithValue("@room", roommate.Room);
                     int id = (int)cmd.ExecuteScalar();
 
                     roommate.Id = id;
@@ -170,12 +220,12 @@ namespace Roommates.Repositories
                                     SET FirstName = @firstName,
                                         LastName = @lastName,
                                         RentPortion = @rentPortion,
-                                        MovedInDate = @movedInDate
+                                        MoveInDate = @moveInDate
                                     WHERE Id = @id";
                     cmd.Parameters.AddWithValue("@firstName", roommate.FirstName);
                     cmd.Parameters.AddWithValue("@lastName", roommate.LastName);
                     cmd.Parameters.AddWithValue("@rentPortion", roommate.RentPortion);
-                    cmd.Parameters.AddWithValue("@movedInDate", roommate.MovedInDate);
+                    cmd.Parameters.AddWithValue("@moveInDate", roommate.MoveInDate);
 
                     cmd.ExecuteNonQuery();
                 }
